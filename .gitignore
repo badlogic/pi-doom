@@ -1,0 +1,18 @@
+# Build output
+doom/build/
+doom/doomgeneric/
+
+# WAD files (game data)
+*.wad
+*.WAD
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
