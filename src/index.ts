@@ -9,6 +9,10 @@ import { DoomEngine } from "./doom-engine.js";
 import { DoomComponent } from "./doom-component.js";
 import { findWadFile } from "./wad-finder.js";
 
+// Persistent engine instance - survives between /doom invocations
+let activeEngine: DoomEngine | null = null;
+let activeWadPath: string | null = null;
+
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("doom", {
     description: "Play DOOM in your terminal. Usage: /doom [path/to/doom1.wad]",
@@ -19,28 +23,37 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const wad = findWadFile(args?.trim() || undefined);
+      const requestedWad = args?.trim() || undefined;
+      const wad = findWadFile(requestedWad);
+      
       if (!wad) {
         ctx.ui.notify(
-          args
-            ? `WAD file not found: ${args}`
+          requestedWad
+            ? `WAD file not found: ${requestedWad}`
             : "No WAD file found. Download doom1.wad from https://distro.ibiblio.org/slitaz/sources/packages/d/doom1.wad",
           "error"
         );
         return;
       }
 
-      ctx.ui.notify(`Loading DOOM from ${wad}...`, "info");
-
       try {
-        const engine = new DoomEngine(wad);
-        await engine.init();
+        // Reuse existing engine if same WAD, otherwise create new
+        if (activeEngine && activeWadPath === wad) {
+          ctx.ui.notify("Resuming DOOM...", "info");
+        } else {
+          ctx.ui.notify(`Loading DOOM from ${wad}...`, "info");
+          activeEngine = new DoomEngine(wad);
+          await activeEngine.init();
+          activeWadPath = wad;
+        }
 
         await ctx.ui.custom((tui, _theme, done) => {
-          return new DoomComponent(tui, engine, () => done(undefined));
+          return new DoomComponent(tui, activeEngine!, () => done(undefined));
         });
       } catch (error) {
         ctx.ui.notify(`Failed to load DOOM: ${error}`, "error");
+        activeEngine = null;
+        activeWadPath = null;
       }
     },
   });
