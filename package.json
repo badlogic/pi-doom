@@ -3,14 +3,21 @@
   "version": "0.1.0",
   "description": "Play DOOM in your terminal with pi",
   "license": "GPL-2.0",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/badlogic/pi-doom.git"
   },
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./src/index.ts"
+    ]
   },
   "scripts": {
-    "build:doom": "./doom/build.sh"
+    "build:doom": "./doom/build.sh",
+    "start": "npx tsx src/standalone.ts"
+  },
+  "dependencies": {
+    "@mariozechner/pi-tui": "^0.37.7"
   }
 }
