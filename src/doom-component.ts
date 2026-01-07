@@ -78,7 +78,7 @@ export class DoomComponent implements Component {
   }
 
   render(width: number): string[] {
-    const height = this.tui.terminal.rows - 1;
+    const height = this.tui.terminal.rows - 10;
     const rgba = this.engine.getFrameRGBA();
     const lines = renderHalfBlock(rgba, this.engine.width, this.engine.height, width, height);
 

@@ -7,7 +7,6 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-const require = createRequire(import.meta.url);
 
 export interface DoomModule {
   _doomgeneric_Create: (argc: number, argv: number) => void;
@@ -66,9 +65,13 @@ export class DoomEngine {
     const wadData = readFileSync(this.wadPath);
     const wadArray = Array.from(new Uint8Array(wadData));
 
-    // Load WASM module
-    const doomModule = require(doomJsPath);
-    const createDoomModule = doomModule.default || doomModule;
+    // Load WASM module - eval to bypass jiti completely
+    const doomJsCode = readFileSync(doomJsPath, "utf-8");
+    const moduleExports: { exports: unknown } = { exports: {} };
+    const nativeRequire = createRequire(doomJsPath);
+    const moduleFunc = new Function("module", "exports", "__dirname", "__filename", "require", doomJsCode);
+    moduleFunc(moduleExports, moduleExports.exports, buildDir, doomJsPath, nativeRequire);
+    const createDoomModule = moduleExports.exports as (config: unknown) => Promise<DoomModule>;
 
     const moduleConfig = {
       locateFile: (path: string) => {
