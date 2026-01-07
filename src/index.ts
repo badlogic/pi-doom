@@ -5,12 +5,11 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { matchesKey, isKeyRelease, parseKey } from "@mariozechner/pi-tui";
+import { isKeyRelease } from "@mariozechner/pi-tui";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { DoomEngine } from "./doom-engine.js";
 import { mapKeyToDoom } from "./doom-keys.js";
-import { detectImageSupport, renderHalfBlock, renderKitty, type RenderMode } from "./doom-renderer.js";
 
 const TICK_MS = 1000 / 35; // DOOM runs at 35 fps
 const DEFAULT_WAD_PATHS = [
@@ -20,12 +19,41 @@ const DEFAULT_WAD_PATHS = [
   "~/.doom/doom1.wad",
 ];
 
+function renderHalfBlock(
+  rgba: Uint8Array,
+  width: number,
+  height: number,
+  targetCols: number,
+  targetRows: number
+): string[] {
+  const lines: string[] = [];
+  const scaleX = width / targetCols;
+  const scaleY = height / (targetRows * 2);
+
+  for (let row = 0; row < targetRows; row++) {
+    let line = "";
+    const srcY1 = Math.floor(row * 2 * scaleY);
+    const srcY2 = Math.floor((row * 2 + 1) * scaleY);
+
+    for (let col = 0; col < targetCols; col++) {
+      const srcX = Math.floor(col * scaleX);
+      const idx1 = (srcY1 * width + srcX) * 4;
+      const idx2 = (srcY2 * width + srcX) * 4;
+      const r1 = rgba[idx1] ?? 0, g1 = rgba[idx1 + 1] ?? 0, b1 = rgba[idx1 + 2] ?? 0;
+      const r2 = rgba[idx2] ?? 0, g2 = rgba[idx2 + 1] ?? 0, b2 = rgba[idx2 + 2] ?? 0;
+      line += `\x1b[38;2;${r1};${g1};${b1}m\x1b[48;2;${r2};${g2};${b2}m▀`;
+    }
+    line += "\x1b[0m";
+    lines.push(line);
+  }
+  return lines;
+}
+
 class DoomComponent {
   private engine: DoomEngine;
   private interval: ReturnType<typeof setInterval> | null = null;
   private onClose: () => void;
   private tui: { requestRender: () => void; width: number; height: number };
-  private renderMode: "kitty" | "halfblock";
   private cachedLines: string[] = [];
   private cachedWidth = 0;
   private cachedHeight = 0;
@@ -35,21 +63,11 @@ class DoomComponent {
   constructor(
     tui: { requestRender: () => void; width: number; height: number },
     engine: DoomEngine,
-    renderMode: RenderMode,
     onClose: () => void
   ) {
     this.tui = tui;
     this.engine = engine;
     this.onClose = onClose;
-
-    // Determine render mode
-    if (renderMode === "auto") {
-      const support = detectImageSupport();
-      this.renderMode = support ? "kitty" : "halfblock";
-    } else {
-      this.renderMode = renderMode;
-    }
-
     this.startGameLoop();
   }
 
@@ -75,13 +93,11 @@ class DoomComponent {
       return;
     }
 
-    // Map key to DOOM
     const doomKeys = mapKeyToDoom(data);
     if (doomKeys.length === 0) return;
 
     const released = isKeyRelease(data);
     
-    // Simple: press = key down, release = key up
     for (const key of doomKeys) {
       this.engine.pushKey(!released, key);
     }
@@ -93,7 +109,7 @@ class DoomComponent {
   }
 
   render(width: number): string[] {
-    const height = this.tui.height - 2; // Leave room for header/footer
+    const height = this.tui.height - 1;
 
     if (
       width === this.cachedWidth &&
@@ -104,29 +120,10 @@ class DoomComponent {
     }
 
     const rgba = this.engine.getFrameRGBA();
-    const doomWidth = this.engine.width;
-    const doomHeight = this.engine.height;
+    const lines = renderHalfBlock(rgba, this.engine.width, this.engine.height, width, height);
 
-    let lines: string[];
-
-    if (this.renderMode === "kitty") {
-      // Kitty graphics - single escape sequence
-      const seq = renderKitty(rgba, doomWidth, doomHeight, width, height);
-      // Output empty lines for height, then move up and render image
-      lines = [];
-      for (let i = 0; i < height - 1; i++) {
-        lines.push("");
-      }
-      const moveUp = height > 1 ? `\x1b[${height - 1}A` : "";
-      lines.push(moveUp + seq);
-    } else {
-      // Half-block rendering
-      lines = renderHalfBlock(rgba, doomWidth, doomHeight, width, height);
-    }
-
-    // Add controls footer
-    const footer = "\x1b[2m DOOM | Q=Quit | WASD/Arrows=Move | Shift+WASD=Run | Space=Use | F=Fire | 1-7=Weapons\x1b[0m";
-    lines.push(footer);
+    // Footer
+    lines.push("\x1b[2m DOOM | Q=Quit | WASD/Arrows=Move | Shift+WASD=Run | Space=Use | F=Fire | 1-7=Weapons\x1b[0m");
 
     this.cachedLines = lines;
     this.cachedWidth = width;
@@ -161,7 +158,7 @@ function findWadFile(customPath?: string): string | null {
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("doom", {
-    description: "Play DOOM in your terminal. Usage: /doom [path/to/doom1.wad] [--mode=auto|kitty|halfblock]",
+    description: "Play DOOM in your terminal. Usage: /doom [path/to/doom1.wad]",
 
     handler: async (args, ctx) => {
       if (!ctx.hasUI) {
@@ -169,28 +166,12 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      // Parse args
-      let wadPath: string | undefined;
-      let renderMode: RenderMode = "auto";
-
-      const parts = args?.split(/\s+/) || [];
-      for (const part of parts) {
-        if (part.startsWith("--mode=")) {
-          const mode = part.slice(7);
-          if (mode === "kitty" || mode === "halfblock" || mode === "auto") {
-            renderMode = mode;
-          }
-        } else if (part && !part.startsWith("-")) {
-          wadPath = part;
-        }
-      }
-
       // Find WAD file
-      const wad = findWadFile(wadPath);
+      const wad = findWadFile(args?.trim() || undefined);
       if (!wad) {
         ctx.ui.notify(
-          wadPath
-            ? `WAD file not found: ${wadPath}`
+          args
+            ? `WAD file not found: ${args}`
             : "No WAD file found. Download doom1.wad from https://distro.ibiblio.org/slitaz/sources/packages/d/doom1.wad",
           "error"
         );
@@ -204,12 +185,7 @@ export default function (pi: ExtensionAPI) {
         await engine.init();
 
         await ctx.ui.custom((tui, _theme, done) => {
-          return new DoomComponent(
-            tui,
-            engine,
-            renderMode,
-            () => done(undefined)
-          );
+          return new DoomComponent(tui, engine, () => done(undefined));
         });
       } catch (error) {
         ctx.ui.notify(`Failed to load DOOM: ${error}`, "error");
