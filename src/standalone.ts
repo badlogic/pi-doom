@@ -5,75 +5,17 @@
  * Usage: npx tsx src/standalone.ts [path/to/doom1.wad] [--mode=auto|kitty|halfblock]
  */
 
-import { TUI, ProcessTerminal, matchesKey, Key, isKeyRelease, parseKey } from "@mariozechner/pi-tui";
+import { TUI, ProcessTerminal, isKeyRelease } from "@mariozechner/pi-tui";
 import type { Component } from "@mariozechner/pi-tui";
 import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
+import { mapKeyToDoom } from "./doom-keys.js";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// ============================================================================
-// DOOM Keys
-// ============================================================================
-
-const DoomKeys = {
-  KEY_RIGHTARROW: 0xae,
-  KEY_LEFTARROW: 0xac,
-  KEY_UPARROW: 0xad,
-  KEY_DOWNARROW: 0xaf,
-  KEY_STRAFE_L: 0xa0,
-  KEY_STRAFE_R: 0xa1,
-  KEY_USE: 0xa2,
-  KEY_FIRE: 0xa3,
-  KEY_ESCAPE: 27,
-  KEY_ENTER: 13,
-  KEY_TAB: 9,
-  KEY_BACKSPACE: 127,
-  KEY_RSHIFT: 0x80 + 0x36,
-  KEY_RCTRL: 0x80 + 0x1d,
-} as const;
-
-function mapKeyToDoom(data: string): number[] {
-  if (matchesKey(data, Key.up)) return [DoomKeys.KEY_UPARROW];
-  if (matchesKey(data, Key.down)) return [DoomKeys.KEY_DOWNARROW];
-  if (matchesKey(data, Key.right)) return [DoomKeys.KEY_RIGHTARROW];
-  if (matchesKey(data, Key.left)) return [DoomKeys.KEY_LEFTARROW];
-  // WASD - check both raw char and Kitty sequences
-  if (data === "w" || matchesKey(data, "w")) return [DoomKeys.KEY_UPARROW];
-  if (data === "W" || matchesKey(data, Key.shift("w"))) return [DoomKeys.KEY_UPARROW, DoomKeys.KEY_RSHIFT];
-  if (data === "s" || matchesKey(data, "s")) return [DoomKeys.KEY_DOWNARROW];
-  if (data === "S" || matchesKey(data, Key.shift("s"))) return [DoomKeys.KEY_DOWNARROW, DoomKeys.KEY_RSHIFT];
-  if (data === "a" || matchesKey(data, "a")) return [DoomKeys.KEY_STRAFE_L];
-  if (data === "A" || matchesKey(data, Key.shift("a"))) return [DoomKeys.KEY_STRAFE_L, DoomKeys.KEY_RSHIFT];
-  if (data === "d" || matchesKey(data, "d")) return [DoomKeys.KEY_STRAFE_R];
-  if (data === "D" || matchesKey(data, Key.shift("d"))) return [DoomKeys.KEY_STRAFE_R, DoomKeys.KEY_RSHIFT];
-  if (data === "f" || data === "F" || matchesKey(data, "f") || matchesKey(data, Key.shift("f"))) return [DoomKeys.KEY_FIRE];
-  if (data === " ") return [DoomKeys.KEY_USE];
-  if (matchesKey(data, Key.enter)) return [DoomKeys.KEY_ENTER];
-  if (matchesKey(data, Key.escape)) return [DoomKeys.KEY_ESCAPE];
-  if (matchesKey(data, Key.tab)) return [DoomKeys.KEY_TAB];
-  if (matchesKey(data, Key.backspace)) return [DoomKeys.KEY_BACKSPACE];
-  // Ctrl keys (except Ctrl+C) = fire
-  // Check both legacy (raw ctrl chars) and Kitty protocol (CSI sequences)
-  const parsed = parseKey(data);
-  if (parsed && parsed.startsWith("ctrl+") && parsed !== "ctrl+c") {
-    return [DoomKeys.KEY_FIRE];
-  }
-  if (data.length === 1 && data.charCodeAt(0) < 32 && data !== "\x03") {
-    return [DoomKeys.KEY_FIRE];
-  }
-  if (data >= "0" && data <= "9") return [data.charCodeAt(0)];
-  if (data === "y" || data === "Y") return ["y".charCodeAt(0)];
-  if (data === "n" || data === "N") return ["n".charCodeAt(0)];
-  if (data.length === 1 && data.charCodeAt(0) >= 32) {
-    return [data.toLowerCase().charCodeAt(0)];
-  }
-  return [];
-}
 
 // ============================================================================
 // DOOM Engine
@@ -232,28 +174,15 @@ function renderHalfBlock(rgba: Uint8Array, width: number, height: number, target
 // DOOM Component
 // ============================================================================
 
-// Debug log - last N messages
-const DEBUG_LINES = 5;
-let debugLog: string[] = [];
-
-function debug(msg: string): void {
-  debugLog.push(msg);
-  if (debugLog.length > DEBUG_LINES) {
-    debugLog.shift();
-  }
-}
-
 class DoomComponent implements Component {
   private engine: DoomEngine;
   private tui: TUI;
   private interval: ReturnType<typeof setInterval> | null = null;
   private onExit: () => void;
-  private gameHeight: number;
 
-  constructor(tui: TUI, engine: DoomEngine, gameHeight: number, onExit: () => void) {
+  constructor(tui: TUI, engine: DoomEngine, onExit: () => void) {
     this.tui = tui;
     this.engine = engine;
-    this.gameHeight = gameHeight;
     this.onExit = onExit;
     this.startGameLoop();
   }
@@ -280,13 +209,6 @@ class DoomComponent implements Component {
     }
 
     const doomKeys = mapKeyToDoom(data);
-    
-    // Debug output
-    const hex = [...data].map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
-    const parsed = parseKey(data);
-    const rel = isKeyRelease(data);
-    debug(`[${hex}] parsed=${parsed} release=${rel} doomKeys=${doomKeys.join(',')}`);
-
     if (doomKeys.length === 0) return;
 
     const released = isKeyRelease(data);
@@ -298,21 +220,12 @@ class DoomComponent implements Component {
   }
 
   render(width: number): string[] {
+    const height = this.tui.terminal.rows - 1;
     const rgba = this.engine.getFrameRGBA();
-    const lines = renderHalfBlock(rgba, this.engine.width, this.engine.height, width, this.gameHeight);
+    const lines = renderHalfBlock(rgba, this.engine.width, this.engine.height, width, height);
 
     // Footer
     lines.push("\x1b[2m DOOM | Q=Quit | WASD/Arrows=Move | Shift+WASD=Run | Space=Use | F=Fire | 1-7=Weapons\x1b[0m");
-    
-    // Debug area
-    lines.push("\x1b[33m--- Debug ---\x1b[0m");
-    for (const msg of debugLog) {
-      lines.push("\x1b[2m" + msg.slice(0, width) + "\x1b[0m");
-    }
-    // Pad to DEBUG_LINES
-    for (let i = debugLog.length; i < DEBUG_LINES; i++) {
-      lines.push("");
-    }
 
     return lines;
   }
@@ -358,10 +271,7 @@ async function main() {
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal);
 
-  // Leave room for footer + debug area
-  const gameHeight = terminal.rows - DEBUG_LINES - 3;
-
-  const doomComponent = new DoomComponent(tui, engine, gameHeight, () => {
+  const doomComponent = new DoomComponent(tui, engine, () => {
     tui.stop();
     process.exit(0);
   });

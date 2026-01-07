@@ -34,44 +34,66 @@ export const DoomKeys = {
   KEY_RALT: 0x80 + 0x38,
 } as const;
 
+import { matchesKey, Key, parseKey } from "@mariozechner/pi-tui";
+
 /**
  * Map terminal key input to DOOM key codes
+ * Supports both raw terminal input and Kitty protocol sequences
  */
-export function mapKeyToDoom(data: string, name?: string): number[] {
-  const keyName = name?.toLowerCase() ?? "";
+export function mapKeyToDoom(data: string): number[] {
+  // Arrow keys
+  if (matchesKey(data, Key.up)) return [DoomKeys.KEY_UPARROW];
+  if (matchesKey(data, Key.down)) return [DoomKeys.KEY_DOWNARROW];
+  if (matchesKey(data, Key.right)) return [DoomKeys.KEY_RIGHTARROW];
+  if (matchesKey(data, Key.left)) return [DoomKeys.KEY_LEFTARROW];
 
-  // Arrow keys (escape sequences)
-  if (data === "\x1b[A" || keyName === "up") return [DoomKeys.KEY_UPARROW];
-  if (data === "\x1b[B" || keyName === "down") return [DoomKeys.KEY_DOWNARROW];
-  if (data === "\x1b[C" || keyName === "right") return [DoomKeys.KEY_RIGHTARROW];
-  if (data === "\x1b[D" || keyName === "left") return [DoomKeys.KEY_LEFTARROW];
+  // WASD - check both raw char and Kitty sequences
+  if (data === "w" || matchesKey(data, "w")) return [DoomKeys.KEY_UPARROW];
+  if (data === "W" || matchesKey(data, Key.shift("w"))) return [DoomKeys.KEY_UPARROW, DoomKeys.KEY_RSHIFT];
+  if (data === "s" || matchesKey(data, "s")) return [DoomKeys.KEY_DOWNARROW];
+  if (data === "S" || matchesKey(data, Key.shift("s"))) return [DoomKeys.KEY_DOWNARROW, DoomKeys.KEY_RSHIFT];
+  if (data === "a" || matchesKey(data, "a")) return [DoomKeys.KEY_STRAFE_L];
+  if (data === "A" || matchesKey(data, Key.shift("a"))) return [DoomKeys.KEY_STRAFE_L, DoomKeys.KEY_RSHIFT];
+  if (data === "d" || matchesKey(data, "d")) return [DoomKeys.KEY_STRAFE_R];
+  if (data === "D" || matchesKey(data, Key.shift("d"))) return [DoomKeys.KEY_STRAFE_R, DoomKeys.KEY_RSHIFT];
 
-  // WASD
-  if (data === "w" || data === "W") return [DoomKeys.KEY_UPARROW];
-  if (data === "s" || data === "S") return [DoomKeys.KEY_DOWNARROW];
-  if (data === "a" || data === "A") return [DoomKeys.KEY_STRAFE_L];
-  if (data === "d" || data === "D") return [DoomKeys.KEY_STRAFE_R];
+  // Fire - F key
+  if (data === "f" || data === "F" || matchesKey(data, "f") || matchesKey(data, Key.shift("f"))) {
+    return [DoomKeys.KEY_FIRE];
+  }
 
-  // Action keys
-  if (data === " ") return [DoomKeys.KEY_USE];
-  if (data === "\r" || data === "\n" || keyName === "return") return [DoomKeys.KEY_ENTER];
-  if (data === "\x1b" || keyName === "escape") return [DoomKeys.KEY_ESCAPE];
-  if (data === "\t" || keyName === "tab") return [DoomKeys.KEY_TAB];
-  if (data === "\x7f" || keyName === "backspace") return [DoomKeys.KEY_BACKSPACE];
+  // Use/Open
+  if (data === " " || matchesKey(data, Key.space)) return [DoomKeys.KEY_USE];
 
-  // Ctrl = Fire (but not Ctrl+C)
-  if (data.charCodeAt(0) < 32 && data !== "\x03") return [DoomKeys.KEY_FIRE];
+  // Menu/UI keys
+  if (matchesKey(data, Key.enter)) return [DoomKeys.KEY_ENTER];
+  if (matchesKey(data, Key.escape)) return [DoomKeys.KEY_ESCAPE];
+  if (matchesKey(data, Key.tab)) return [DoomKeys.KEY_TAB];
+  if (matchesKey(data, Key.backspace)) return [DoomKeys.KEY_BACKSPACE];
 
-  // Weapon selection
+  // Ctrl keys (except Ctrl+C) = fire (legacy support)
+  const parsed = parseKey(data);
+  if (parsed && parsed.startsWith("ctrl+") && parsed !== "ctrl+c") {
+    return [DoomKeys.KEY_FIRE];
+  }
+  if (data.length === 1 && data.charCodeAt(0) < 32 && data !== "\x03") {
+    return [DoomKeys.KEY_FIRE];
+  }
+
+  // Weapon selection (0-9)
   if (data >= "0" && data <= "9") return [data.charCodeAt(0)];
 
-  // Plus/minus
+  // Plus/minus for screen size
   if (data === "+" || data === "=") return [DoomKeys.KEY_EQUALS];
   if (data === "-") return [DoomKeys.KEY_MINUS];
 
   // Y/N for prompts
-  if (data === "y" || data === "Y") return ["y".charCodeAt(0)];
-  if (data === "n" || data === "N") return ["n".charCodeAt(0)];
+  if (data === "y" || data === "Y" || matchesKey(data, "y") || matchesKey(data, Key.shift("y"))) {
+    return ["y".charCodeAt(0)];
+  }
+  if (data === "n" || data === "N" || matchesKey(data, "n") || matchesKey(data, Key.shift("n"))) {
+    return ["n".charCodeAt(0)];
+  }
 
   // Other printable characters (for cheats)
   if (data.length === 1 && data.charCodeAt(0) >= 32) {
