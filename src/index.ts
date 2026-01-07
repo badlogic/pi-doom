@@ -25,7 +25,7 @@ export default function (pi: ExtensionAPI) {
 
       const requestedWad = args?.trim() || undefined;
       const wad = findWadFile(requestedWad);
-      
+
       if (!wad) {
         ctx.ui.notify(
           requestedWad
@@ -49,7 +49,7 @@ export default function (pi: ExtensionAPI) {
           activeWadPath = wad;
         }
 
-        await ctx.ui.custom((tui, _theme, done) => {
+        await ctx.ui.custom((tui, _theme, _keybindings, done) => {
           return new DoomComponent(tui, activeEngine!, () => done(undefined), isResume);
         });
       } catch (error) {
