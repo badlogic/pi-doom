@@ -1,7 +1,7 @@
 import { TUI, isKeyRelease } from "@mariozechner/pi-tui";
 import type { Component } from "@mariozechner/pi-tui";
 import { DoomEngine } from "./doom-engine.js";
-import { mapKeyToDoom } from "./doom-keys.js";
+import { mapKeyToDoom, DoomKeys } from "./doom-keys.js";
 
 function renderHalfBlock(
   rgba: Uint8Array,
@@ -39,10 +39,17 @@ export class DoomComponent implements Component {
   private interval: ReturnType<typeof setInterval> | null = null;
   private onExit: () => void;
 
-  constructor(tui: TUI, engine: DoomEngine, onExit: () => void) {
+  constructor(tui: TUI, engine: DoomEngine, onExit: () => void, resume = false) {
     this.tui = tui;
     this.engine = engine;
     this.onExit = onExit;
+    
+    // Unpause if resuming
+    if (resume) {
+      this.engine.pushKey(true, DoomKeys.KEY_PAUSE);
+      this.engine.pushKey(false, DoomKeys.KEY_PAUSE);
+    }
+    
     this.startGameLoop();
   }
 
@@ -60,8 +67,11 @@ export class DoomComponent implements Component {
   }
 
   handleInput(data: string): void {
-    // Q to quit (but not on release)
+    // Q to pause and exit (but not on release)
     if (!isKeyRelease(data) && (data === "q" || data === "Q")) {
+      // Send DOOM's pause key before exiting
+      this.engine.pushKey(true, DoomKeys.KEY_PAUSE);
+      this.engine.pushKey(false, DoomKeys.KEY_PAUSE);
       this.dispose();
       this.onExit();
       return;

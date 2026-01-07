@@ -38,8 +38,10 @@ export default function (pi: ExtensionAPI) {
 
       try {
         // Reuse existing engine if same WAD, otherwise create new
+        let isResume = false;
         if (activeEngine && activeWadPath === wad) {
           ctx.ui.notify("Resuming DOOM...", "info");
+          isResume = true;
         } else {
           ctx.ui.notify(`Loading DOOM from ${wad}...`, "info");
           activeEngine = new DoomEngine(wad);
@@ -48,7 +50,7 @@ export default function (pi: ExtensionAPI) {
         }
 
         await ctx.ui.custom((tui, _theme, done) => {
-          return new DoomComponent(tui, activeEngine!, () => done(undefined));
+          return new DoomComponent(tui, activeEngine!, () => done(undefined), isResume);
         });
       } catch (error) {
         ctx.ui.notify(`Failed to load DOOM: ${error}`, "error");
