@@ -5,7 +5,7 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { isKeyRelease } from "@mariozechner/pi-tui";
+import { isKeyRelease, TUI } from "@mariozechner/pi-tui";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { DoomEngine } from "./doom-engine.js";
@@ -53,7 +53,7 @@ class DoomComponent {
   private engine: DoomEngine;
   private interval: ReturnType<typeof setInterval> | null = null;
   private onClose: () => void;
-  private tui: { requestRender: () => void; width: number; height: number };
+  private tui: TUI;
   private cachedLines: string[] = [];
   private cachedWidth = 0;
   private cachedHeight = 0;
@@ -61,7 +61,7 @@ class DoomComponent {
   private cachedVersion = -1;
 
   constructor(
-    tui: { requestRender: () => void; width: number; height: number },
+    tui: TUI,
     engine: DoomEngine,
     onClose: () => void
   ) {
@@ -109,7 +109,7 @@ class DoomComponent {
   }
 
   render(width: number): string[] {
-    const height = this.tui.height - 1;
+    const height = this.tui.terminal.rows - 1;
 
     if (
       width === this.cachedWidth &&
