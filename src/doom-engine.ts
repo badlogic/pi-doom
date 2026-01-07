@@ -2,9 +2,12 @@
  * DOOM Engine - WebAssembly wrapper for doomgeneric
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 export interface DoomModule {
   _doomgeneric_Create: (argc: number, argv: number) => void;
@@ -54,6 +57,10 @@ export class DoomEngine {
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const buildDir = join(__dirname, "..", "doom", "build");
     const doomJsPath = join(buildDir, "doom.js");
+
+    if (!existsSync(doomJsPath)) {
+      throw new Error(`WASM not found at ${doomJsPath}. Run ./doom/build.sh first`);
+    }
 
     // Read WAD file
     const wadData = readFileSync(this.wadPath);
