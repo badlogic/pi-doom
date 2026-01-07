@@ -67,7 +67,8 @@ export class DoomEngine {
     const wadArray = Array.from(new Uint8Array(wadData));
 
     // Load WASM module
-    const createDoomModule = require(doomJsPath);
+    const doomModule = require(doomJsPath);
+    const createDoomModule = doomModule.default || doomModule;
 
     const moduleConfig = {
       locateFile: (path: string) => {
