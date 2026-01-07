@@ -38,6 +38,9 @@ export class DoomComponent implements Component {
   private tui: TUI;
   private interval: ReturnType<typeof setInterval> | null = null;
   private onExit: () => void;
+  
+  // Opt-in to key release events for smooth movement
+  wantsKeyRelease = true;
 
   constructor(tui: TUI, engine: DoomEngine, onExit: () => void, resume = false) {
     this.tui = tui;
