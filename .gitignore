@@ -1,10 +1,5 @@
-# Build output
-doom/build/
+# Build intermediate files (keep doom/build/ for distribution)
 doom/doomgeneric/
-
-# WAD files (game data)
-*.wad
-*.WAD
 
 # Node
 node_modules/
