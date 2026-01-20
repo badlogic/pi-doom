@@ -2,12 +2,25 @@
   "name": "pi-doom",
   "version": "0.1.0",
   "description": "Play DOOM in your terminal with pi",
+  "author": "Mario Zechner",
   "license": "GPL-2.0",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/badlogic/pi-doom.git"
   },
+  "keywords": [
+    "pi",
+    "pi-extension",
+    "doom",
+    "terminal",
+    "game"
+  ],
+  "files": [
+    "src",
+    "doom/build",
+    "doom1.wad"
+  ],
   "pi": {
     "extensions": [
       "./src/index.ts"
