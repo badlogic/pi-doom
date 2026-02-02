@@ -1,6 +1,6 @@
 {
   "name": "pi-doom",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Play DOOM in your terminal with pi",
   "author": "Mario Zechner",
   "license": "GPL-2.0",
@@ -11,6 +11,7 @@
   },
   "keywords": [
     "pi",
+    "pi-package",
     "pi-extension",
     "doom",
     "terminal",
@@ -24,7 +25,8 @@
   "pi": {
     "extensions": [
       "./src/index.ts"
-    ]
+    ],
+    "video": "https://sink.mariozechner.at/api/share/f90ba774c4f13b0274bd5655dcb44922/file/doom.mp4"
   },
   "scripts": {
     "build:doom": "./doom/build.sh",
