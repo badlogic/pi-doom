@@ -70,8 +70,9 @@ export class DoomComponent implements Component {
   }
 
   handleInput(data: string): void {
-    // Q to pause and exit (but not on release)
-    if (!isKeyRelease(data) && (data === "q" || data === "Q")) {
+    // Shift+Q to pause and exit (but not on release)
+    // Only uppercase Q exits - lowercase q is needed for cheat codes like IDDQD
+    if (!isKeyRelease(data) && data === "Q") {
       // Send DOOM's pause key before exiting
       this.engine.pushKey(true, DoomKeys.KEY_PAUSE);
       this.engine.pushKey(false, DoomKeys.KEY_PAUSE);
@@ -98,7 +99,7 @@ export class DoomComponent implements Component {
     const lines = renderHalfBlock(rgba, this.engine.width, this.engine.height, width, height);
 
     // Footer - truncate to fit terminal width
-    const fullFooter = " DOOM | Q=Pause | WASD/Arrows=Move | Shift+WASD=Run | Space=Use | F=Fire | 1-7=Weapons";
+    const fullFooter = " DOOM | Shift+Q=Pause | WASD/Arrows=Move | Shift+WASD=Run | Space=Use | F=Fire | 1-7=Weapons";
     const footer = fullFooter.length > width ? fullFooter.slice(0, width) : fullFooter;
     lines.push(`\x1b[2m${footer}\x1b[0m`);
 
