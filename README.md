@@ -8,7 +8,7 @@ Play DOOM in your terminal with [pi](https://github.com/badlogic/pi-mono).
 
 ```bash
 git clone https://github.com/badlogic/pi-doom.git
-pi --extensions /path/to/pi-doom
+pi --extension /path/to/pi-doom
 ```
 
 Then in pi:
